@@ -17,6 +17,19 @@ The editor running inside buzz-remote (installed from `dist/OB-Xd.wclap.tar.gz`)
 
 ![OB-Xd in buzz-remote](docs/obxd-in-buzz-remote.png)
 
+## Download
+
+Every push to `main` builds the package and publishes it with a download page
+on GitHub Pages (`.github/workflows/pages.yml`):
+
+- page: https://dahlgrenmartin.github.io/prometheos-webclap-obxd/
+- package (stable URL, installable by URL in a host):
+  https://dahlgrenmartin.github.io/prometheos-webclap-obxd/OB-Xd.wclap.tar.gz
+
+The archive is reproducible: it depends only on the bundle's bytes. The page
+also serves the editor as a static preview under `editor/`. Publishing needs
+**Settings → Pages → Source: GitHub Actions** once.
+
 ## Surface
 
 - one stereo instrument output, no audio input;
@@ -118,7 +131,7 @@ dist/
   OB-Xd.wclap/
     module.wasm
     LICENSE
-  OB-Xd.wclap.tar.gz      # install this in a WebCLAP host
+  OB-Xd.wclap.tar.gz      # install this in a WebCLAP host (reproducible)
   OB-Xd.wclap.sha256
 ```
 
@@ -128,10 +141,12 @@ preview1 functions.
 ## Using it in buzz-remote
 
 With the WebCLAP backend of buzz-remote (`prometheos-apps`,
-`apps/buzz-remote`), open **Plugins**, install `dist/OB-Xd.wclap.tar.gz` (or
-the `OB-Xd.wclap` folder), and add **OB-Xd** from the WebCLAP group of the New
-Machine menu. Its parameters are pattern columns and controller endpoints;
-double-click the machine (or use its editor action) to open the web editor.
+`apps/buzz-remote`), open **Machines → Plugins…**, install the package (the
+Pages URL above with **Install URL**, or `dist/OB-Xd.wclap.tar.gz` with
+**Install File…**), restart the audio engine, and add **OB-Xd** from
+**Machines → New Machine → Generators → discoDSP**. Its parameters are
+pattern columns and controller endpoints; double-click the machine (or use its
+**Editor…** menu item) to open the web editor.
 
 ## Tests
 

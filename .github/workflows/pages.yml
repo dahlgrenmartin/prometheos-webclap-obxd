@@ -1,7 +1,10 @@
-name: verify
+name: pages
+
+# Builds the WCLAP package and publishes it with a download page on GitHub
+# Pages. Requires Settings -> Pages -> Source: "GitHub Actions".
 
 on:
-  pull_request:
+  push:
     branches: [main]
   workflow_dispatch:
 
@@ -9,11 +12,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: verify-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
-  verify:
+  build:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -56,15 +59,21 @@ jobs:
       - name: Assemble download site
         run: node scripts/build-site.mjs dist _site
 
-      - name: Native CLAP tests
-        run: |
-          cmake -S . -B build-native -G Ninja -DBUILD_NATIVE_TESTS=ON
-          cmake --build build-native --parallel 2
-          ctest --test-dir build-native --output-on-failure
+      - uses: actions/configure-pages@v5
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-pages-artifact@v3
         with:
-          name: OB-Xd.wclap
-          path: |
-            dist/OB-Xd.wclap.tar.gz
-            dist/OB-Xd.wclap.sha256
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

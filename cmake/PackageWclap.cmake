@@ -25,12 +25,25 @@ file(COPY_FILE "${LICENSE}" "${DEST}/LICENSE")
 get_filename_component(_parent "${DEST}" DIRECTORY)
 get_filename_component(_name "${DEST}" NAME)
 file(REMOVE "${ARCHIVE}")
+# GNU tar + gzip -n so the archive depends only on the bundle's bytes: no
+# builder uid, umask, file times or gzip header timestamp leak into it.
+find_program(_tar tar REQUIRED)
+find_program(_gzip gzip REQUIRED)
 execute_process(
-  COMMAND "${CMAKE_COMMAND}" -E tar czf "${ARCHIVE}" --format=gnutar "--mtime=1980-01-01 00:00:00 UTC"
-    "${_name}/LICENSE" "${_name}/module.wasm"
+  COMMAND "${_tar}" --sort=name --owner=0 --group=0 --numeric-owner
+    --mode=u=rw,go=r --mtime=@315532800 --format=gnu
+    -cf - "${_name}/LICENSE" "${_name}/module.wasm"
+  COMMAND "${_gzip}" -n -9
   WORKING_DIRECTORY "${_parent}"
-  RESULT_VARIABLE _tar_result
+  OUTPUT_FILE "${ARCHIVE}"
+  RESULTS_VARIABLE _tar_results
 )
+set(_tar_result 0)
+foreach(_result IN LISTS _tar_results)
+  if(NOT _result EQUAL 0)
+    set(_tar_result "${_result}")
+  endif()
+endforeach()
 if(NOT _tar_result EQUAL 0)
   message(FATAL_ERROR "Failed to write ${ARCHIVE}")
 endif()
