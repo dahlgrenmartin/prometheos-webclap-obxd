@@ -1,6 +1,7 @@
 [submodule "vendor/obxd"]
 	path = vendor/obxd
 	url = https://github.com/reales/OB-Xd.git
+	ignore = dirty
 [submodule "vendor/clap"]
 	path = vendor/clap
 	url = https://github.com/free-audio/clap.git
