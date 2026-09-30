@@ -1,0 +1,323 @@
+:root {
+  --panel: #1d2025;
+  --panel-hi: #262a31;
+  --ink: #f2f2f2;
+  --ink-dim: #9aa0a8;
+  --rule: #2f7fe0;
+  --rule-glow: rgba(64, 150, 255, 0.55);
+  --divider: #121418;
+  --led-on: #ff2a1a;
+  --led-off: #3a0f0c;
+  --display-bg: #1c0605;
+  --display-ink: #ff3322;
+  --font: "Arial Black", "Arial Bold", "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  width: 1000px;
+  height: 423px;
+  overflow: hidden;
+  background: #000;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: var(--font);
+  font-weight: 800;
+}
+
+.panel {
+  position: relative;
+  width: 1000px;
+  height: 423px;
+  background:
+    radial-gradient(ellipse at 50% -20%, rgba(255, 255, 255, 0.05), transparent 60%),
+    linear-gradient(180deg, var(--panel-hi) 0%, var(--panel) 45%, #191b1f 100%);
+  color: var(--ink);
+  overflow: hidden;
+}
+
+/* Walnut end cheeks */
+.cheek {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 22px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, rgba(255, 220, 180, 0.07) 0 2px, transparent 2px 7px),
+    linear-gradient(90deg, #6e3f22, #a1653b 35%, #8a5230 70%, #5a321b);
+  z-index: 2;
+}
+.cheek.left { left: 0; box-shadow: inset -2px 0 3px rgba(0, 0, 0, 0.6); }
+.cheek.right { right: 0; box-shadow: inset 2px 0 3px rgba(0, 0, 0, 0.6); }
+
+/* Logo */
+.logo {
+  position: absolute;
+  left: 34px;
+  top: 8px;
+  width: 188px;
+}
+.logo-mark {
+  display: block;
+  width: 188px;
+  height: 52px;
+  overflow: visible;
+}
+.logo-mark text {
+  font-family: "Arial Black", Impact, sans-serif;
+  font-size: 104px;
+  font-weight: 900;
+  letter-spacing: -4px;
+  fill: #181a1e;
+  stroke: #f4f4f4;
+  stroke-width: 5px;
+  paint-order: stroke;
+}
+.logo-sub {
+  margin-top: 5px;
+  font-size: 7.2px;
+  font-weight: 800;
+  letter-spacing: 2.35px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #e8e8e8;
+}
+
+/* Section titles with the blue rules above and below */
+.section {
+  position: absolute;
+  height: 19px;
+  border-top: 1.5px solid var(--rule);
+  border-bottom: 1.5px solid var(--rule);
+  box-shadow: 0 -1px 2px var(--rule-glow), 0 1px 2px var(--rule-glow);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 16px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  text-shadow: 0 1px 1px #000;
+}
+
+.divider {
+  position: absolute;
+  width: 2px;
+  background: linear-gradient(90deg, var(--divider), #2b2f36);
+}
+
+.label {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 9px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--ink);
+  text-shadow: 0 1px 1px #000;
+  pointer-events: none;
+}
+.label svg { width: 13px; height: 8px; vertical-align: -1px; stroke: var(--ink); stroke-width: 1.6; fill: none; }
+
+/* Knobs */
+.knob {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border-radius: 50%;
+  cursor: ns-resize;
+  touch-action: none;
+  outline: none;
+}
+.knob::before {
+  /* knurled skirt */
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(from 0deg, #3a3d42 0deg 6deg, #0d0e10 6deg 12deg);
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.7), 0 0 0 1px #07080a;
+}
+.knob .cap {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 30%, #50545b 0%, #1c1e22 45%, #070809 100%);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.18), inset 0 -2px 3px rgba(0, 0, 0, 0.8);
+}
+.knob .pointer {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+}
+.knob .pointer::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 2px rgba(255, 255, 255, 0.7);
+}
+.knob:focus-visible::before { box-shadow: 0 0 0 2px var(--rule), 0 3px 5px rgba(0, 0, 0, 0.7); }
+
+/* LED push buttons */
+.button {
+  position: absolute;
+  width: 31px;
+  height: 28px;
+  margin: -14px 0 0 -15.5px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #4a4e55 0%, #2c2f35 12%, #26292e 60%, #1b1d21 100%);
+  box-shadow: 0 0 0 1px #0a0b0d, 0 3px 4px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  outline: none;
+}
+.button::before {
+  /* the pressed face */
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: 12px;
+  bottom: 3px;
+  border-radius: 1px;
+  background: linear-gradient(180deg, #2f3238, #202227);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 -1px 0 rgba(0, 0, 0, 0.6);
+}
+.button .led {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #6a1e18, var(--led-off));
+  box-shadow: inset 0 0 1px #000;
+}
+.button.on .led {
+  background: radial-gradient(circle at 40% 35%, #ffb3a8, var(--led-on) 55%, #b10d05);
+  box-shadow: 0 0 5px 1px rgba(255, 50, 30, 0.85);
+}
+.button:active { transform: translateY(1px); }
+.button:focus-visible { box-shadow: 0 0 0 2px var(--rule), 0 3px 4px rgba(0, 0, 0, 0.7); }
+.button.menu-button {
+  background: linear-gradient(180deg, #d63a2e, #9e1d15 50%, #7a130d);
+}
+.button.menu-button::before { background: linear-gradient(180deg, #b82519, #8d170f); }
+.button.menu-button .led { display: none; }
+.button.disabled { opacity: 0.45; cursor: not-allowed; }
+.button.disabled:active { transform: none; }
+
+/* Red LED displays */
+.display {
+  position: absolute;
+  height: 28px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #120303, var(--display-bg));
+  box-shadow: 0 0 0 1px #050101, inset 0 0 8px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.07);
+  color: var(--display-ink);
+  font-family: "Courier New", monospace;
+  font-weight: 700;
+  font-style: italic;
+  font-size: 20px;
+  line-height: 28px;
+  text-align: center;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 0 0 6px rgba(255, 40, 20, 0.85);
+  cursor: pointer;
+  outline: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.display:focus-visible { box-shadow: 0 0 0 2px var(--rule); }
+
+/* Value readout */
+.readout {
+  position: absolute;
+  z-index: 10;
+  padding: 2px 6px;
+  border-radius: 2px;
+  background: rgba(8, 9, 11, 0.92);
+  box-shadow: 0 0 0 1px #3a3f47;
+  color: #fff;
+  font-family: Arial, sans-serif;
+  font-size: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, 0);
+}
+.readout b { color: #8fc2ff; font-weight: 700; margin-right: 4px; }
+
+/* Menu */
+.menu {
+  position: absolute;
+  z-index: 20;
+  min-width: 170px;
+  padding: 3px 0;
+  background: #15171b;
+  box-shadow: 0 0 0 1px #3a3f47, 0 6px 16px rgba(0, 0, 0, 0.7);
+  font-family: Arial, sans-serif;
+  font-size: 11px;
+}
+.menu button {
+  display: block;
+  width: 100%;
+  padding: 5px 12px;
+  border: 0;
+  background: none;
+  color: #e6e6e6;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.menu button:hover, .menu button:focus-visible { background: #2f7fe0; color: #fff; outline: none; }
+.menu hr { border: 0; border-top: 1px solid #2c3037; margin: 3px 0; }
+.menu .info { padding: 4px 12px; color: var(--ink-dim); font-size: 10px; }
+
+/* Extended controls overlay */
+.extended {
+  position: absolute;
+  z-index: 15;
+  left: 232px;
+  top: 40px;
+  width: 536px;
+  height: 250px;
+  background: linear-gradient(180deg, #23262c, #1a1c20);
+  box-shadow: 0 0 0 1px #3a3f47, 0 10px 30px rgba(0, 0, 0, 0.8);
+  border-radius: 3px;
+}
+.extended-title {
+  position: relative;
+  height: 24px;
+  border-bottom: 1.5px solid var(--rule);
+  font-size: 11px;
+  line-height: 24px;
+  text-align: center;
+  text-transform: uppercase;
+}
+.extended .close {
+  position: absolute;
+  right: 4px;
+  top: 2px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  background: none;
+  color: #ddd;
+  font-size: 16px;
+  cursor: pointer;
+}
+.extended-controls { position: relative; height: 226px; }

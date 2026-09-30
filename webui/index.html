@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OB-Xd</title>
+<link rel="stylesheet" href="obxd.css">
+</head>
+<body>
+<div id="panel" class="panel" role="application" aria-label="OB-Xd synthesizer">
+  <div class="cheek left" aria-hidden="true"></div>
+  <div class="cheek right" aria-hidden="true"></div>
+  <div class="logo" aria-hidden="true">
+    <svg viewBox="0 0 372 100" class="logo-mark">
+      <text x="186" y="84" text-anchor="middle">OB-Xd</text>
+    </svg>
+    <div class="logo-sub">Virtual Analog Synthesizer</div>
+  </div>
+  <div id="controls"></div>
+  <div id="readout" class="readout" hidden></div>
+  <div id="menu" class="menu" hidden></div>
+  <div id="extended" class="extended" hidden>
+    <div class="extended-title">Extended <button type="button" class="close" id="extended-close" aria-label="Close">×</button></div>
+    <div id="extended-controls" class="extended-controls"></div>
+  </div>
+</div>
+<script src="obxd.js"></script>
+</body>
+</html>

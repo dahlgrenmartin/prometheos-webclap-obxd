@@ -1,0 +1,13 @@
+diff --git a/Source/Engine/SynthEngine.h b/Source/Engine/SynthEngine.h
+index c916590..98a058d 100755
+--- a/Source/Engine/SynthEngine.h
++++ b/Source/Engine/SynthEngine.h
+@@ -23,7 +23,7 @@
+  */
+ #pragma once
+ 
+-#include "../PluginProcessor.h"
++#include <ObxdJuceShim.h>
+ #include "ObxdVoice.h"
+ #include "Motherboard.h"
+ #include "Params.h"
