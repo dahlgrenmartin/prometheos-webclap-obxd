@@ -3,7 +3,8 @@
 Date: 2026-10-04
 Status: draft for review. Builds on the offline proof of concept in this
 directory; see [performance.md](../../performance.md) for the measurements this
-design relies on.
+design relies on. Revised for buzz-remote's planned engine v2 (latency
+compensation, multi-IO, stereo effects; §2 and §3.7).
 
 ## 1. Goal
 
@@ -19,11 +20,14 @@ Success means:
   bounded latency (target ≤ 30 ms on top of the audio device);
 - parameters are buzz globals and controller endpoints, and plugin state
   round-trips through `.bzw`;
+- with engine v2, a Windows effect stays sample-aligned with the dry signal
+  around it, and a sidechain plugin gets its key signal on its own input;
 - **Dexed 0.9.3 plays dense 8-voice material at 48 kHz with no underruns** on a
   mid-range laptop for 10 minutes.
 
 Out of scope: 64-bit plugins (see option 3 in performance.md), plugin editors in
-v1, sidechains and multi-bus plugins, copy-protected plugins.
+v1, copy-protected plugins. Sidechains and multi-bus plugins come with engine v2
+(§3.7).
 
 ## 2. Facts this design rests on
 
@@ -56,6 +60,20 @@ From the code:
   browser main thread** (`boxedwine-multithreaded-audio.js`).
 - Wine maps drive `Z:` to `/`, so a Windows program can open a Boxedwine
   device as `Z:\dev\<name>`.
+- The WebCLAP host has no `clap.latency` support and writes 0 into each audio
+  buffer's `latency` field (`WclapPlugin.ts`).
+
+Planned, as a separate milestone (**engine v2**), from the Buzz beta machine
+interface:
+
+- per-machine latency reporting (`GetLatency`) with host compensation;
+- multiple named stereo inputs and outputs per machine, connections that land on
+  a specific input, and `NULL` for an unconnected input or a silent output
+  (`MIF_MULTI_IO`, `MultiWork`); the WebCLAP mapping is one stereo CLAP port per
+  channel, the first input main, the rest sidechains;
+- stereo-in/stereo-out effects (`MIF_STEREO_EFFECT`);
+- work calls of at most 256 frames (`MAX_BUFFER_LENGTH`);
+- a native dynamics compressor with a sidechain input.
 
 ## 3. Brainstorm: options per decision
 
@@ -79,12 +97,20 @@ From the code:
 
 ### 3.3 Latency strategy
 
+The machine's latency is the bridge's `L` plus the plugin's own (VST2
+`AEffect.initialDelay`, VST3 `IAudioProcessor::getLatencySamples()`).
+
 | Option | Verdict |
 |---|---|
-| Fixed output latency `L` for everything | **v1.** Simple and robust. |
-| **Render ahead for sequenced material**: the scheduler hands this machine its events `L` samples early, so its output lands on time | **v2.** Pattern playback sounds latency-free; only live input and knob moves pay `L`. |
-| Graph-wide plugin delay compensation | Later; buzz has no PDC concept. |
-| **Freeze**: render a heavy plugin's track ahead, in the background, at any speed, and play the cached audio | **v3, the safety net** for plugins that can't keep up in real time (a DAW "freeze track" for emulated plugins). Re-render the affected span when patterns change. |
+| Fixed, uncompensated `L` | **Only before engine v2.** Fine for a lone instrument; wrong for an effect next to its dry signal or on a send, which comes out `L` late. |
+| **Report the latency to engine v2 (`GetLatency`) and let the engine compensate** | **Chosen.** The engine delays parallel paths so they meet aligned. This is what makes Windows *effects* usable, and it is the same mechanism a latent CLAP plugin needs. No compensation code in the winvst machine. |
+| **Pre-roll sources**: for a machine without audio inputs, the engine delivers its sequenced events `latency` samples early instead of delaying everything else | **Ask of engine v2** (this replaces this design's earlier winvst-only scheduler change). Pattern playback through a Windows instrument then adds no latency to the song. Machines that take audio input still need delay-based compensation; live notes and knob moves on the machine still pay `L`. |
+| **Freeze**: render a heavy plugin's track ahead, in the background, at any speed, and play the cached audio | **Later, the safety net** for plugins that can't keep up in real time (a DAW "freeze track" for emulated plugins). Re-render the affected span when patterns change. |
+
+Latency changes only on a restart, never mid-playback, as CLAP requires
+(`clap_host_latency.changed` with the plugin deactivated). That covers both a
+higher `L` after underruns and a plugin that changes its own latency (VST2
+`audioMasterIOChanged`, VST3 `restartComponent(kLatencyChanged)`).
 
 ### 3.4 Process model
 
@@ -97,8 +123,10 @@ From the code:
 
 The emulator renders blocks of `B` frames. Bigger blocks amortize per-block
 overhead (device call, wake-up, JIT dispatch) but raise latency. Default
-`B = 256`, configurable 128–1024; `L` defaults to `4B` (1,024 frames ≈ 21 ms
-at 48 kHz) and is raised automatically after underruns.
+`B = 256` (the same as `MAX_BUFFER_LENGTH`, so one engine work call never spans
+more than one block), configurable 128–1024. `L` defaults to `4B` (1,024
+frames ≈ 21 ms at 48 kHz). After underruns the machine proposes a higher `L`
+and applies it at the next stop, because the new latency re-aligns the graph.
 
 ### 3.6 Start-up cost
 
@@ -114,6 +142,19 @@ at 48 kHz) and is raised automatically after underruns.
   translation of the note path doesn't hit live playback.
 - Idea to research: snapshot the booted emulator's memory and restore it (as v86
   does) for near-instant start.
+
+### 3.7 Ports: stereo effects, multi-IO and sidechains
+
+| Option | Verdict |
+|---|---|
+| One stereo input and output only | Only before engine v2. |
+| **Each plugin bus becomes one engine v2 stereo channel** | **Chosen**, mirroring the WebCLAP mapping. **VST3:** every audio bus from `getBusInfo` (`kMain`/`kAux`, name), arranged as stereo with `setBusArrangements`; the main input is the main input, and aux inputs are sidechains. **VST2:** `numInputs`/`numOutputs` taken in pairs and named with `effGetInputProperties`/`effGetOutputProperties`; input pairs after the first count as sidechains, the usual VST2 convention (a 4-input compressor). Mono buses are up- or down-mixed at the edge. |
+| Unconnected inputs | Engine v2 passes `NULL`. The worklet sets a "connected" bitmask in the request; the guest feeds silence and sets VST3 `silenceFlags`. Buses stay active, because VST3 only allows `activateBus` while the plugin is inactive. |
+
+The port list is part of `DESCRIBE` and is frozen at install, like WebCLAP
+descriptors, so the patch view and connection routing are shared with
+WebCLAP machines. More ports cost little: two stereo inputs at 256 frames are
+4 KB per block, against hundreds of microseconds of emulated DSP.
 
 ## 4. Architecture
 
@@ -146,10 +187,13 @@ Boxedwine MT (pthreads)  ── Wine ── vsthost.exe --bridge
 - **Channel layout** (little-endian, 64-byte aligned, versioned header):
   - control words (`Int32`): state, sample rate, block frames, `requestSeq`,
     `responseSeq`, underruns, last process time (µs), fault code;
+  - port counts (stereo inputs, stereo outputs), fixed at `LOAD`;
   - request ring: fixed-size records, one per block: `blockIndex`, frame count,
-    transport (playing, tempo, beat position), then up to N events
-    `{offset, type, a, b, value}` (note on/off, CC, pitch bend, parameter, program);
-  - audio-out ring and audio-in ring: planar float32, power-of-two capacity.
+    the input-connected bitmask, transport (playing, tempo, beat position), then
+    up to N events `{offset, type, a, b, value}` (note on/off, CC, pitch bend,
+    parameter, program);
+  - one audio ring per stereo port, inputs and outputs: planar float32,
+    power-of-two capacity.
 - **Guest calls**:
   - `ioctl(ATTACH, channel)` binds the handle; Wine's `DeviceIoControl` or a
     first `WriteFile` command carries it (Phase 0 decides which works through Wine).
@@ -173,7 +217,10 @@ Boxedwine MT (pthreads)  ── Wine ── vsthost.exe --bridge
 - Per-instance thread setup: FTZ/DAZ in MXCSR and x87 control word, so
   denormals can't stall the emulated FPU; `SetThreadPriority(TIME_CRITICAL)`.
 - `DESCRIBE` returns the JSON the offline host already produces (name, vendor,
-  kind, parameters with display text), used once at install time.
+  kind, parameters with display text) plus the port list (§3.7) and the
+  plugin's latency, used once at install time.
+- Latency or I/O changes reported by the plugin go back on the reply ring; the
+  machine applies them at the next restart (§3.3).
 - State: VST2 `effGetChunk`/`effSetChunk` (or the parameter list when the
   plugin has no chunks); VST3 `IComponent::getState`/`setState` and the
   controller's `setComponentState`, through an in-memory `IBStream`.
@@ -188,16 +235,17 @@ Boxedwine MT (pthreads)  ── Wine ── vsthost.exe --bridge
   with the MT Boxedwine build, boot progress, channel allocation and the
   control channel; posts the region's SharedArrayBuffer plus channel offsets to
   the worklet; runs the watchdog.
-- **`WinVstMachine`** (worklet, `ProcessMachine`):
-  - **v1**: each block, encode this block's events into the next request,
-    `Atomics.notify`, and read the output written `L` frames earlier. On a
+- **`WinVstMachine`** (worklet), written against the engine v2 machine
+  interface: multi-port work call, latency getter.
+  - Each block: write this block's inputs and events into the next request,
+    `Atomics.notify`, and read the outputs written `L` frames earlier. On a
     shortfall, output silence, count an underrun and report it through
-    telemetry. No allocation in `process()`.
-  - **v2**: `WorkletTimelineScheduler` gains a per-machine `lookaheadSamples`:
-    it delivers this machine's tick and row events `L` samples early, computed
-    from the compiled schedule and the current tempo. Seek, loop and tempo
-    changes flush the ring and re-sync. A tempo change inside the lookahead
-    window is accepted as a small error at first.
+    telemetry. No allocation in the work call.
+  - Reports `L` + plugin latency. Compensation and source pre-roll belong to
+    the engine (§3.3); seek, loop and tempo changes flush the rings and
+    re-sync.
+  - Before engine v2 lands: the current `ProcessMachine`, main stereo ports
+    only, uncompensated `L`.
 - Parameters as `word` globals (`endpointKey = winvst:<index>`), the same
   encoding as the WebCLAP backend; plugin-side changes come back on a reply ring.
 - Persistence: `prometheos.winvst/1` project extension, with `Machine.data` =
@@ -234,6 +282,8 @@ Boxedwine MT (pthreads)  ── Wine ── vsthost.exe --bridge
 | Memory growth replacing `HEAPU8.buffer` | Allocate the region at start-up; consumers re-acquire views on growth. |
 | Underruns from JIT spikes and scheduling | Warm-up render, adaptive `L`, freeze fallback, telemetry. |
 | 158 MB first download | IndexedDB prefix plus a slim filesystem (Phase 3). |
+| Phase 1 depends on engine v2's latency and port interface | Build against it; if it is late, ship with the current `ProcessMachine`, main ports and uncompensated `L`, and switch over without changing the bridge. |
+| Latency changes (a higher `L`, a plugin's own latency) | Applied only at stop/restart; engine v2 has to accept a machine's latency changing between runs. |
 | Licences | Users supply their own binaries; Boxedwine GPL-2.0+, Wine LGPL, host GPL-3.0. |
 
 ## 8. Testing
@@ -246,6 +296,13 @@ Boxedwine MT (pthreads)  ── Wine ── vsthost.exe --bridge
   **sample-identical** to the offline render of the same events (the existing
   `vsthost` one-shot mode is the reference). This catches lost, late or
   misplaced events.
+- **Ports (engine v2):** a PoC sidechain plugin, built here as VST2 (4
+  inputs) and VST3 (main plus aux bus), that outputs main × sidechain (the
+  "product" output of the beta SDK's `modulator.cpp`). Run through the
+  sample-identity check, it proves per-port routing and `NULL` inputs.
+- **Latency compensation (engine v2):** a PoC invert effect in parallel with
+  its dry signal; with correct compensation the mix is exactly silent, which
+  proves alignment to the sample.
 - **Endurance (headless Chromium):** Dexed, 10 minutes of sequenced 8-voice
   material, zero underruns at the default `L`; record block-time percentiles.
 - **buzz-remote:** install, describe, `.bzw` round trip, controller routing,
@@ -255,11 +312,29 @@ Boxedwine MT (pthreads)  ── Wine ── vsthost.exe --bridge
 
 0. **Spike and go/no-go** (this repository): MT build plus `/dev/vstbridge`
    plus `vsthost --bridge`, one channel, a test page with an AudioWorklet and an
-   on-screen keyboard playing Dexed live. Measure the realtime factor in MT,
+   on-screen keyboard playing Dexed live. The shared layout carries port counts
+   and per-port rings from the start, exercised with one stereo output. Measure the realtime factor in MT,
    wake-up latency, block jitter and underruns at `L` = 512/1,024/2,048.
-1. **buzz-remote machine with fixed latency:** format, install/describe,
-   parameters, state, `.bzw`, telemetry.
-2. **Render-ahead** for sequenced playback; **freeze** mode.
+1. **buzz-remote machine on engine v2:** format, install/describe, ports and
+   sidechains, reported latency, parameters, state, `.bzw`, telemetry. Engine
+   v2's compensation and source pre-roll replace this design's earlier
+   winvst-only render-ahead.
+2. **Freeze** mode.
 3. **Scale and polish:** parallel instances, plugin editors through the
    Boxedwine canvas, IndexedDB prefix, slim filesystem, start-up snapshot
    research.
+
+## 10. Asks of engine v2
+
+What the winvst machine needs from the engine milestone (all of it is also
+useful for latent or multi-port WebCLAP plugins):
+
+1. A per-machine latency that the engine compensates by delaying parallel
+   paths, and that may change between runs (on stop or restart).
+2. Pre-roll for machines without audio inputs: sequenced events delivered
+   `latency` samples early, so latent instruments add no latency to playback.
+3. Named stereo ports with a main or sidechain role, frozen with the machine's
+   descriptor, `NULL` for unconnected inputs, and connections that name the
+   target port.
+4. Per-machine latency and underrun counts in telemetry, so the UI can show why
+   a machine is late or glitching.

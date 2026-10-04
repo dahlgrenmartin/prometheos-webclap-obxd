@@ -23,7 +23,9 @@ through a shared-memory device. Everything stays in `experiments/boxedwine-vst`.
 3. **`/dev/vstbridge` (patch 0003).**
    - Region allocation at start-up and the exported `_vstbridge_region()`.
    - Shared layout header (`vstbridge_abi.h`) and its TypeScript twin, with a
-     layout test.
+     layout test. Port counts and one ring per stereo port from the start
+     (spec §3.7), so engine v2's sidechains don't change the layout later;
+     Phase 0 uses one stereo output.
    - Blocking `read` on `requestSeq` with `emscripten_futex_wait`; `write` to
      audio-out; `ATTACH`.
    - A native unit test in Boxedwine's test runner for wrap-around and sequence
