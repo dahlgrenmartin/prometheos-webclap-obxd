@@ -41,6 +41,7 @@ browser page (web/)                        Boxedwine (WebAssembly)
 | `tests/` | `browser_render.mjs` (headless Chromium end-to-end), `fputest.c` and `wintest.c` (emulator diagnostics). |
 | `docs/results.md` | Measurements, and the problems found and fixed on the way. |
 | `docs/performance.md` | Why emulation is slow next to yabridge, and the options for real-time use. |
+| `docs/superpowers/` | Design spec and Phase 0 plan for real-time Windows plugins in buzz-remote, browser-only. |
 
 ## Results
 
