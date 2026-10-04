@@ -1,0 +1,40 @@
+name: boxedwine-vst
+
+# The Windows side of the Boxedwine VST proof of concept: vsthost.exe and the
+# VST2/VST3 test plugins, cross-compiled with MinGW. The Boxedwine/Emscripten
+# build and the browser test are run by hand (see experiments/boxedwine-vst).
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ["experiments/boxedwine-vst/**", ".github/workflows/boxedwine-vst.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-binaries:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize VST3 pluginterfaces
+        run: git submodule update --init experiments/boxedwine-vst/vendor/pluginterfaces
+      - name: Install MinGW (i686)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-mingw-w64-i686 g++-mingw-w64-i686 zip
+      - name: Build vsthost.exe and the test plugins
+        working-directory: experiments/boxedwine-vst
+        run: |
+          BUILD_SITE=0 ./build.sh
+          i686-w64-mingw32-objdump -p build/PoCSynth.dll | grep -E 'VSTPluginMain|\bmain\b'
+          i686-w64-mingw32-objdump -p build/PoCSynth.vst3 | grep GetPluginFactory
+          node --check web/app.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: boxedwine-vst-windows
+          path: |
+            experiments/boxedwine-vst/build/vstpoc.zip
+            experiments/boxedwine-vst/build/vstpoc-prefix.zip

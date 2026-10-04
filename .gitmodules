@@ -5,3 +5,6 @@
 [submodule "vendor/clap"]
 	path = vendor/clap
 	url = https://github.com/free-audio/clap.git
+[submodule "experiments/boxedwine-vst/vendor/pluginterfaces"]
+	path = experiments/boxedwine-vst/vendor/pluginterfaces
+	url = https://github.com/steinbergmedia/vst3_pluginterfaces.git

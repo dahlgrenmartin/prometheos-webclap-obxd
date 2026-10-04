@@ -161,3 +161,10 @@ node tests/wasm_contract.test.mjs dist/OB-Xd.wclap/module.wasm
 The native tests drive the plugin only through the exported `clap_entry` and
 the C ABI: lifecycle, parameters and text, desktop-compatible state, audio and
 events, and the webview editor protocol.
+
+## Experiments
+
+[`experiments/boxedwine-vst`](experiments/boxedwine-vst/) is a proof of concept
+that runs unmodified 32-bit Windows VST2/VST3 plugin binaries in the browser:
+a Windows host program under Wine inside Boxedwine (an x86 emulator compiled to
+WebAssembly), in the spirit of yabridge's Wine-side plugin host.
