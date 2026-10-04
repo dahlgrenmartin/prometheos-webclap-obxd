@@ -59,6 +59,8 @@ struct ParamReport {
 };
 
 struct Report {
+    double processStartMs = 0; // when the audio loop started (after plugin init)
+    double processEndMs = 0;
     std::string format;
     std::string name;
     std::string vendor;
@@ -229,6 +231,7 @@ bool renderVst2(HMODULE dll, const Options &o, Report &r, std::vector<float> &au
     call(effMainsChanged, 0, 1);
     call(effStartProcess);
     trace("processing");
+    r.processStartMs = nowMs();
 
     const size_t total = static_cast<size_t>(o.seconds * o.rate);
     const size_t noteOff = static_cast<size_t>(total * 0.6);
@@ -286,6 +289,7 @@ bool renderVst2(HMODULE dll, const Options &o, Report &r, std::vector<float> &au
         p.value = e->getParameter(e, i);
         r.params.push_back(p);
     }
+    r.processEndMs = nowMs();
     trace("rendered");
     call(effStopProcess);
     call(effMainsChanged, 0, 0);
@@ -418,6 +422,7 @@ bool renderVst3(HMODULE dll, const Options &o, Report &r, std::vector<float> &au
     }
     component->setActive(true);
     processor->setProcessing(true);
+    r.processStartMs = nowMs();
 
     const size_t total = static_cast<size_t>(o.seconds * o.rate);
     const size_t noteOff = static_cast<size_t>(total * 0.6);
@@ -504,6 +509,7 @@ bool renderVst3(HMODULE dll, const Options &o, Report &r, std::vector<float> &au
         }
     }
 
+    r.processEndMs = nowMs();
     processor->setProcessing(false);
     component->setActive(false);
     processor->release();
@@ -573,13 +579,17 @@ int runJob(const Options &o) {
     HMODULE dll = LoadLibraryA(o.plugin.c_str());
     const double loadMs = nowMs() - t0;
     bool ok = false;
-    double renderMs = 0;
+    double renderMs = 0, initMs = 0, processMs = 0;
     if (!dll) {
         r.error = "LoadLibrary failed, error " + std::to_string(GetLastError());
     } else {
         const double t1 = nowMs();
         ok = endsWithI(o.plugin, ".vst3") ? renderVst3(dll, o, r, audio) : renderVst2(dll, o, r, audio);
         renderMs = nowMs() - t1;
+        if (r.processEndMs > r.processStartMs) {
+            initMs = r.processStartMs - t1;
+            processMs = r.processEndMs - r.processStartMs;
+        }
     }
 
     double peak = 0, sum = 0;
@@ -610,12 +620,15 @@ int runJob(const Options &o) {
     json += "  \"synth\": " + std::string(r.synth ? "true" : "false") + ",\n";
     json += "  \"inputs\": " + std::to_string(r.inputs) + ",\n";
     json += "  \"outputs\": " + std::to_string(r.outputs) + ",\n";
-    char nums[256];
+    // realtimeFactor is audio length / audio-processing time: plugin start-up
+    // (initMs) is a one-off cost reported separately.
+    char nums[512];
     std::snprintf(nums, sizeof nums,
                   "  \"sampleRate\": %.0f,\n  \"frames\": %u,\n  \"peak\": %.6f,\n  \"rms\": %.6f,\n"
-                  "  \"nonFinite\": %u,\n  \"loadMs\": %.1f,\n  \"renderMs\": %.1f,\n  \"realtimeFactor\": %.3f,\n",
-                  o.rate, static_cast<unsigned>(audio.size() / 2), peak, rms, nonFinite, loadMs, renderMs,
-                  renderMs > 0 ? (o.seconds * 1000.0) / renderMs : 0.0);
+                  "  \"nonFinite\": %u,\n  \"loadMs\": %.1f,\n  \"renderMs\": %.1f,\n  \"initMs\": %.1f,\n"
+                  "  \"processMs\": %.1f,\n  \"realtimeFactor\": %.3f,\n",
+                  o.rate, static_cast<unsigned>(audio.size() / 2), peak, rms, nonFinite, loadMs, renderMs, initMs,
+                  processMs, processMs > 0 ? (o.seconds * 1000.0) / processMs : 0.0);
     json += nums;
     json += "  \"wav\": \"" + jsonEscape(o.out) + "\",\n";
     json += "  \"error\": \"" + jsonEscape(r.error) + "\",\n";

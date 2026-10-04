@@ -10,11 +10,17 @@ Chromium (Playwright). Every render is a 3-note chord (MIDI 60, 64, 67) at
 
 `tests/browser_render.mjs` against `dist/`, one page session, one emulator boot:
 
-| Plugin | Format | Origin | Peak | RMS | Params | Plugin render time (2 s of audio) | Job round trip |
+| Plugin | Format | Origin | Peak | RMS | Params | Audio processing (2 s of audio) | Plugin start-up |
 |---|---|---|---|---|---|---|---|
-| PoC Synth | VST2 | built here (MinGW) | 0.419 | 0.118 | 3 | 364 ms (5.5× realtime) | 2.2 s |
-| PoC Synth | VST3 | built here (MinGW) | 0.419 | 0.118 | 3 | 170 ms (11.8× realtime) | 2.1 s |
-| Dexed 0.9.3 | VST2 | asb2m10, JUCE, MSVC, 2017 | 0.351 | 0.063 | 155 | 8.1–9.8 s (0.2–0.25× realtime) | 9.5–12 s |
+| PoC Synth | VST2 | built here (MinGW) | 0.419 | 0.118 | 3 | 97 ms (**~20× realtime**) | 0.2 s |
+| PoC Synth | VST3 | built here (MinGW) | 0.419 | 0.118 | 3 | 167 ms (**~12× realtime**) | 0 s |
+| Dexed 0.9.3 | VST2 | asb2m10, JUCE, MSVC, 2017 | 0.351 | 0.063 | 155 | 430–530 ms (**3.8–4.7× realtime**) | 9.1 s first time, then 0.55 s |
+
+Start-up is a one-off cost per load: the first `VSTPluginMain` in a session
+runs JUCE's and Wine's GUI start-up through a cold JIT. In this
+render-per-job harness, each job also pays `LoadLibrary` (0.5 s) and Dexed's
+`FreeLibrary` (6–8 s while JUCE stops its threads); a real-time host would load
+the plugin once. See [performance.md](performance.md).
 
 - Emulator boot until `vsthost --serve` is ready: **20 s** (from page load, with
   the Wine zip served locally).

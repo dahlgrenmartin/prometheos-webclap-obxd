@@ -162,7 +162,8 @@ async function showResult(report, wav, wall) {
     ["Format", report.format.toUpperCase() + (report.synth ? " instrument" : " effect")],
     ["Binary", report.plugin],
     ["Audio", `${report.frames} frames @ ${report.sampleRate} Hz, peak ${report.peak.toFixed(3)}, RMS ${report.rms.toFixed(3)}`],
-    ["Plugin render time", `${report.renderMs.toFixed(0)} ms (${report.realtimeFactor.toFixed(2)}× realtime, emulated)`],
+    ["Plugin start-up", `${report.loadMs.toFixed(0)} ms load + ${report.initMs.toFixed(0)} ms init (one-off per load)`],
+    ["Audio processing", `${report.processMs.toFixed(0)} ms (${report.realtimeFactor.toFixed(2)}× realtime, emulated)`],
     ["Job round trip", `${wall.toFixed(1)} s`],
   ];
   $("facts").innerHTML = "";

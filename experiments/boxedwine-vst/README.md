@@ -40,22 +40,32 @@ browser page (web/)                        Boxedwine (WebAssembly)
 | `serve.py` | Serves `dist/` with COOP/COEP headers. |
 | `tests/` | `browser_render.mjs` (headless Chromium end-to-end), `fputest.c` and `wintest.c` (emulator diagnostics). |
 | `docs/results.md` | Measurements, and the problems found and fixed on the way. |
+| `docs/performance.md` | Why emulation is slow next to yabridge, and the options for real-time use. |
 
 ## Results
 
 Measured in headless Chromium (details and screenshots in
 [docs/results.md](docs/results.md)):
 
-| Plugin | Format | Origin | In the browser | Natively (x64 JIT) |
+| Plugin | Format | Origin | In the browser (audio processing) | Natively (x64 JIT) |
 |---|---|---|---|---|
-| PoC Synth | VST2 | built here | renders, peak 0.42, 5.5× realtime | renders, 50× realtime |
-| PoC Synth | VST3 | built here | renders, peak 0.42, 11.8× realtime | renders, 16× realtime |
-| **Dexed 0.9.3** | VST2 | third party (JUCE, MSVC, 2017) | **renders, peak 0.35, 155 parameters**, 0.2× realtime | blocks in `VSTPluginMain` (headless window creation, see below) |
+| PoC Synth | VST2 | built here | renders, peak 0.42, ~20× realtime | renders, 50× realtime |
+| PoC Synth | VST3 | built here | renders, peak 0.42, ~12× realtime | renders, 16× realtime |
+| **Dexed 0.9.3** | VST2 | third party (JUCE, MSVC, 2017) | **renders, peak 0.35, 155 parameters, 3.8–4.7× realtime** | blocks in `VSTPluginMain` (headless window creation, see below) |
 
-The emulator boots to a serving `vsthost` in about 20 s. After that, each render
-is a job round trip of about 2 s for the test synth and about 10 s for Dexed. `--play`
+The emulator boots to a serving `vsthost` in about 20 s. Dexed's first
+`VSTPluginMain` in a session takes about 9 s (one-off JUCE/Wine start-up). The
+audio processing itself is faster than realtime from the first render. `--play`
 was verified to play through Boxedwine's browser audio (`waveOut: played 44100
 frames`).
+
+Emulation is still about 100–200× slower than native code: the same synth DSP
+takes 0.86 ms natively, 0.79 ms as WebAssembly compiled from source, and about
+100–170 ms as an x86 DLL under Boxedwine in the browser.
+**[docs/performance.md](docs/performance.md)** explains why, and lays out the
+options for real-time use: streaming with the plugin kept loaded and
+render-ahead, a faster JIT, static recompilation of plugin DLLs to WebAssembly
+("plugin recomp"), source ports to WebCLAP, and a local native companion.
 
 ## Boxedwine changes
 
@@ -107,10 +117,9 @@ with a matching `.emscripten_url` marker.
   buffer (as yabridge does with shared memory) and play them through an
   AudioWorklet. `--play` shows the guest-to-browser audio path works through
   `waveOut`.
-- **Speed.** The WebAssembly JIT runs a heavy plugin like Dexed at about
-  0.2–0.25× realtime, so real-time use needs either lighter plugins, more
-  emulator speed (the multithreaded JIT target, a persistent JIT cache), or
-  offline rendering as done here.
+- **Speed.** Emulated plugin code runs about 100–200× slower than native.
+  Dexed still processes at about 4× realtime, but heavier plugins will not fit;
+  see [docs/performance.md](docs/performance.md).
 - **No plugin editors.** Plugin GUIs would need Boxedwine's window output (it
   already draws Wine windows to a canvas) wired to `effEditOpen` / `IPlugView`.
 - **JUCE plugins under headless native Boxedwine.** Creating any window (even a
